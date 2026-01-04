@@ -20,12 +20,12 @@ cd student_improvement_project
 - You can add more students or weeks to the dataset
   
 #Terminal Output
-======================================
-Name: Tharini
-Roll No: 1
-Improvement Rate: 3.78
-Improvement Category: High Improvement
-Reason: Consistently completes homework, Excellent attendance, Participates in extra classes
-======================================
+
+1. Name: Tharini
+2. Roll No: 1
+3. Improvement Rate: 3.78
+4. Improvement Category: High Improvement
+5. Reason: Consistently completes homework, Excellent attendance, Participates in extra classes
+
 
 
