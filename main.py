@@ -1,133 +1,188 @@
-import pandas as pd
+import streamlit as st
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
-import matplotlib.pyplot as plt
+from datetime import datetime
 
-# ================= LOAD DATA =================
-data = pd.read_csv("data/student_data.csv")
+# ================= PAGE CONFIG =================
+st.set_page_config(
+    page_title="Student Academic Improvement",
+    layout="centered"
+)
 
-# ================= USER INPUT =================
-name = input("Enter your Name: ")
-roll_no = input("Enter your Roll Number: ")
+# ================= BACKGROUND IMAGE =================
+bg_image_url = "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f"
 
-student_df = data[data['student_id'] == int(roll_no)]
-if student_df.empty:
-    print(f"No data found for Roll No {roll_no}")
-    exit()
+st.markdown(f"""
+<style>
+.stApp {{
+    background-image: url("{bg_image_url}");
+    background-size: cover;
+    background-attachment: fixed;
+}}
 
-# ================= FUNCTION =================
-def calculate_improvement(student_df, degree=2):
-    X = student_df[['week']].values
-    y = student_df['test_score'].values
+.block-container {{
+    background-color: rgba(255, 255, 255, 0.18);
+    padding: 2rem;
+    border-radius: 20px;
+    backdrop-filter: blur(14px);
+}}
 
-    poly = PolynomialFeatures(degree=degree)
+@keyframes fadeIn {{
+    from {{opacity: 0; transform: translateY(-20px);}}
+    to {{opacity: 1; transform: translateY(0);}}
+}}
+
+@keyframes pop {{
+    0% {{transform: scale(0.8); opacity: 0;}}
+    100% {{transform: scale(1); opacity: 1;}}
+}}
+</style>
+""", unsafe_allow_html=True)
+
+# ================= ANIMATED TITLE =================
+st.markdown("""
+<h1 style="text-align:center; animation: fadeIn 2s;">
+📊 Student Academic Improvement Analysis<br>
+<span style="font-size:20px;">By Tharini PS</span>
+</h1>
+""", unsafe_allow_html=True)
+
+st.caption("Polynomial Regression based student performance tracking")
+
+# ================= FORM =================
+with st.form("student_form"):
+
+    st.subheader("👤 Student Details")
+    name = st.text_input("Enter Student Name")
+    roll_no = st.text_input("Enter Roll Number")
+
+    st.subheader("📘 Academic Inputs")
+    semester_pct = st.number_input("Semester Percentage (%)", 0.0, 100.0, 70.0)
+    attendance_pct = st.number_input("Attendance Percentage (%)", 0.0, 100.0, 80.0)
+    homework_pct = st.number_input("Homework Completion Percentage (%)", 0.0, 100.0, 75.0)
+    study_hours = st.number_input("Average Study Hours per Day", 0.0, 12.0, 2.0)
+
+    st.subheader("📅 Weekly Test Scores")
+    weeks = np.array([1, 2, 3, 4, 5])
+    scores = []
+
+    for i in range(5):
+        scores.append(st.number_input(f"Week {i+1} Test Score", 0, 100, 0))
+
+    submit = st.form_submit_button("Analyze Improvement")
+
+# ================= PROCESS =================
+if submit:
+
+    if not name or not roll_no:
+        st.error("Please enter both Name and Roll Number")
+        st.stop()
+
+    y = np.array(scores)
+    X = weeks.reshape(-1, 1)
+
+    # Polynomial Regression
+    poly = PolynomialFeatures(degree=2)
     X_poly = poly.fit_transform(X)
-
     model = LinearRegression()
     model.fit(X_poly, y)
 
-    coef = model.coef_
-    last_week = X.max()
-    improvement_rate = coef[1] + 2 * coef[2] * last_week
+    avg_score = np.mean(y)
+    score_growth = y[-1] - y[0]
 
-    return improvement_rate, model, poly, X, y
+    # ================= CATEGORY LOGIC =================
+    if avg_score >= 90 and score_growth == 0:
+        category = "High Consistent Performance"
+        bg = "#007bff"
 
-def generate_reason(student_df, category):
-    reasons = []
-    # Compute averages
-    hw_avg = student_df['homework_pct'].mean()
-    att_avg = student_df['attendance_pct'].mean()
-    extra_avg = student_df['extra_class_hours'].mean()
-    
-    # High Improvement
-    if category == "High Improvement":
-        if hw_avg >= 75:  # lowered threshold
-            reasons.append("Consistently completes homework")
-        if att_avg >= 85:  # lowered threshold
-            reasons.append("Excellent attendance")
-        if extra_avg >= 1.5:  # lowered threshold
-            reasons.append("Participates in extra classes")
-    # Moderate Improvement
-    elif category == "Moderate Improvement":
-        reasons.append("Moderate study habits or attendance")
-    # Low Improvement
+    elif score_growth >= 15:
+        category = "High Improvement"
+        bg = "#28a745"
+
+    elif score_growth >= 5:
+        category = "Moderate Improvement"
+        bg = "#ffc107"
+
     else:
-        if hw_avg < 65:
-            reasons.append("Low homework completion")
-        if att_avg < 80:
-            reasons.append("Poor attendance")
-        if extra_avg < 1:
-            reasons.append("Rarely attends extra classes")
-    
-    # If nothing matched
-    if not reasons:
-        reasons.append("No specific reason detected")
-    
-    return ", ".join(reasons)
+        category = "Low Improvement"
+        bg = "#dc3545"
 
-# ================= MODELING =================
-rate, model, poly, X, y = calculate_improvement(student_df)
+    # ================= REASONS =================
+    reasons = []
 
-# Categorize improvement
-if rate > 2:
-    category = "High Improvement"
-elif rate >= 1:
-    category = "Moderate Improvement"
-else:
-    category = "Low Improvement"
+    if category == "High Consistent Performance":
+        reasons.append("Consistently high scores across all weeks")
 
-# Generate reason
-reason = generate_reason(student_df, category)
+    elif category == "High Improvement":
+        reasons.append("Strong upward trend in weekly test scores")
 
-# ================= SAVE OUTPUT =================
-output = pd.DataFrame({
-    'student_id': [roll_no],
-    'improvement_rate': [rate],
-    'category': [category],
-    'reason': [reason],
-    'analyst_name': [name]
-})
-output.to_csv("improvement_rates.csv", index=False)
+    elif category == "Moderate Improvement":
+        reasons.append("Gradual improvement with minor fluctuations")
 
-# ================= DISPLAY =================
-print("\n======================================")
-print(f"Name: {name}")
-print(f"Roll No: {roll_no}")
-print(f"Improvement Rate: {rate:.2f}")
-print(f"Improvement Category: {category}")
-print(f"Reason: {reason}")
-print("======================================\n")
+    else:
+        reasons.append("Minimal improvement across weeks")
 
-# ================= VISUALIZATION =================
-# ================= VISUALIZATION =================
-X_plot = np.linspace(X.min(), X.max(), 100).reshape(-1, 1)
-X_plot_poly = poly.transform(X_plot)
-y_plot = model.predict(X_plot_poly)
+    if semester_pct >= 75:
+        reasons.append("Good overall semester performance")
+    else:
+        reasons.append("Semester performance needs improvement")
 
-plt.figure(figsize=(10,6), facecolor='#f0f0f0')  # Figure background color (light gray)
+    if attendance_pct >= 85:
+        reasons.append("Consistent class attendance")
+    else:
+        reasons.append("Attendance inconsistency affected learning")
 
-# Scatter + polynomial curve
-plt.scatter(X, y, color='blue', label='Actual Scores', s=50)
-plt.plot(X_plot, y_plot, color='red', label='Polynomial Fit', linewidth=3)
+    if homework_pct >= 80:
+        reasons.append("Regular homework completion")
+    else:
+        reasons.append("Homework practice needs improvement")
 
-# Set axes background color
-plt.gca().set_facecolor('#e6f2ff')  # light blue inside plot area
+    if study_hours >= 3:
+        reasons.append("Sufficient daily study hours")
+    else:
+        reasons.append("Insufficient daily study time")
 
-# Labels
-plt.xlabel("Week", fontsize=14, fontweight='bold')
-plt.ylabel("Test Score", fontsize=14, fontweight='bold')
-plt.title(f"{name}'s Academic Improvement Curve\nRoll No: {roll_no} | Category: {category}", 
-          fontsize=16, fontweight='bold')
+    # ================= ANIMATED RESULT BOX =================
+    st.markdown(
+        f"""
+        <div style="
+            background-color:{bg};
+            padding:20px;
+            border-radius:15px;
+            animation: pop 0.8s ease;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.3);
+            color:white;
+        ">
+        <h4>📌 Improvement Category: {category}</h4>
+        <b>Name:</b> {name}<br>
+        <b>Roll No:</b> {roll_no}<br>
+        <b>Average Score:</b> {avg_score:.2f}<br>
+        <b>Score Growth:</b> {score_growth}<br>
+        <b>Generated On:</b> {datetime.now().strftime("%d-%m-%Y %H:%M:%S")}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-# Plot reasons with bold
-reason_lines = reason.split(", ")
-for i, line in enumerate(reason_lines):
-    plt.text(X.max() + 0.2, y.max() - i*3, line, fontsize=12, fontweight='bold', color='green')
+    st.subheader("📋 Reason Analysis")
+    for r in reasons:
+        st.write("•", r)
 
-# Legend
-plt.legend(fontsize=12)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.show()
+    # ================= PREMIUM GRAPH =================
+    X_plot = np.linspace(1, 5, 100).reshape(-1, 1)
+    y_plot = model.predict(poly.transform(X_plot))
 
+    fig, ax = plt.subplots()
+    fig.patch.set_alpha(0)
+    ax.set_facecolor("none")
+
+    ax.scatter(X, y, s=80)
+    ax.plot(X_plot, y_plot, linewidth=3)
+
+    ax.set_xlabel("Week")
+    ax.set_ylabel("Test Score")
+    ax.set_title("Academic Performance Trend")
+
+    st.pyplot(fig)
